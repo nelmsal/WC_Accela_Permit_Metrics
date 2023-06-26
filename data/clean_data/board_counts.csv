@@ -1,0 +1,22 @@
+Permit Type,City Council,Design Review Commission,Planning Commission,Staff Level Decision
+Design Review Antenna,0,0,2,1
+Design Review Commercial,3,25,8,54
+Design Review Other,0,9,1,14
+Design Review Residential,2,8,2,27
+General Plan Amendment,2,1,1,0
+MSP,0,2,0,1
+Other,0,0,0,1
+PRE APP,2,1,2,1
+Reasonable Accomodation,0,0,0,1
+SUP,0,0,1,0
+Tentative Map Condo Conversion,0,0,0,1
+Tentative Map Major Subdivision,3,3,3,0
+Tentative Map Minor Subdivision,0,1,0,1
+Tree Dripline Encroachment,1,1,2,0
+Tree Removal Permit,3,2,4,1
+Use Permit Administrative,0,1,2,47
+Use Permit Conditional,1,4,39,3
+Use Permit Minor,0,0,1,0
+Variance,0,0,0,3
+ZCL,0,0,0,75
+Zoning Amendment,3,3,2,0
