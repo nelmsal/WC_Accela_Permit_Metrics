@@ -108,6 +108,36 @@ PLAN_30 = {
     'Staff Analysis - Staff Level Decision':'End'
 }
 
+# decision types
+path = r'data\clean_data\entitlement_info.xlsx'
+# open xlsx file as df and make first row the column names
+ent_df = pd.read_excel(path, header=1) \
+    [['Permit Type', 'Entitlement?', 'Public Hearing?']]
+
+pub_hearing_permit_types = \
+    ent_df[ent_df['Public Hearing?']=='YES']['Permit Type'].unique()
+
+staff_decision_permit_types = \
+    ent_df[ent_df['Public Hearing?']=='NO']['Permit Type'].unique()
+
+# other decision indicators
+staff_dec_ts = [
+    'Staff Level Decision - Approved'
+]
+public_dec_ts = [
+    'Staff Level Decision - Appealed'
+    ]
+
+public_dec_t = [
+    'Design Review Commission', 'Planning Commission', 
+    'Zoning Administrator', 'City Council'
+]
+board_dec_t = [
+    t for t in public_dec_t if t != 'Zoning Administrator'
+]
+
+
+
 # BAD PERMITS?
 bad = [
     'Y18-036',  # inconsistent starts

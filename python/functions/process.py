@@ -593,7 +593,129 @@ def fix_back2back_end_actions(pdf, pids, focus_cols = [
 
     return pdf
 
+def find_round_dict(group_df, id_col = 'T_ID', action_col = 'Action'):
+        
+        start_id = None
+        end_id = None
+        round_num = 0
+        round_dict = {}
 
+        pid = group_df[id_col].unique()[0].rsplit('-', 1)[0]
+
+        for _, row in group_df.iterrows():
+            if (row['Phase'] == 'Review') and (pid not in bad):
+                if 'start' in row[action_col]:
+                    start_id = row[id_col]
+                    end_id = None
+                    round_num += 1
+                    round_dict[row[id_col]] = round_num
+                elif 'end' in row[action_col]:
+                    start_id = None 
+                    end_id = row[id_col]
+                    round_dict[row[id_col]] = round_num
+                else:
+                    if start_id is not None:
+                        round_dict[row[id_col]] = round_num
+                    else:
+                        round_dict[row[id_col]] = 0
+            else:
+                round_dict[row[id_col]] = 0
+
+        return round_dict
+
+# get rounds
+def get_rounds(prep_permit_df):
+
+    
+    # Use the function
+    round_dict = {}
+    for _, group in prep_permit_df.groupby('P_ID'):
+        round_dict.update(find_round_dict(group))
+        
+    # Now you can map the dict to create a new column
+    prep_permit_df['Round'] = prep_permit_df['T_ID'].map(round_dict)
+
+    return prep_permit_df
+
+# get decisions
+
+def get_decision_type(prep_permit_df):
+    prep_permit_df['Task Status'] = prep_permit_df['Task'] + ' - ' + prep_permit_df['Status']
+
+    def check_action(group, check_col, change_col, check_list, new_val='Yes'):
+        if group[check_col].isin(check_list).any():
+            group[change_col] = new_val
+        else:
+            group[change_col] = group[change_col]
+        return group
+
+    def check_action_filt(group, check_col, change_col, check_list, new_val='Yes',
+                        filt_date_col='Date Status', filt_col='Phase', filt_val='Decision', old_val = None):
+        # creating a filtered df so that it only checks the group that is the most recent
+        # example: I only want those in the decision phase (yes_filt) that are more recent than the staff phase (~yes_filt)
+        yes_filt = group[filt_col] == filt_val
+        round_filt = group['Round'] > 0
+        max_no_date = group.loc[~yes_filt&round_filt, filt_date_col].max()
+        filt_group = group[yes_filt&(group[filt_date_col] >= max_no_date)].copy()
+
+        if filt_group[check_col].isin(check_list).any():
+            group[change_col] = new_val
+        else:
+            if old_val is not None:
+                group[change_col] = old_val
+            else:
+                group[change_col] = group[change_col]
+        return group
+
+    def check_decision_filt(group, check_col, change_col, check_list, new_val='Yes',
+                        filt_date_col= 'Date Status', filt_col='Phase', filt_val='Decision', old_val=None):
+        return check_action_filt(group, check_col, change_col, check_list, new_val,
+                        filt_date_col, filt_col, filt_val=filt_val, old_val=old_val)
+
+    def Is_Decision_Task(group, change_col, new_val, old_val):
+        return check_decision_filt(
+            group, check_col='Task', 
+            change_col=change_col, check_list=public_dec_t, new_val=new_val, old_val=old_val)
+
+    def Is_Staff_TaskStatus(group, change_col, new_val):
+        return check_decision_filt(
+            group, check_col='Task Status', 
+            change_col=change_col, check_list=staff_dec_ts, new_val=new_val)
+    
+    def In_Public_TaskStatus(group, change_col, new_val):
+        return check_decision_filt(
+            group, check_col='Task Status', 
+            change_col=change_col, check_list=public_dec_ts, new_val=new_val)
+
+    prep_permit_df['Staff Decision'] = 'No'
+    prep_permit_df['Public Decision'] = 'No'
+
+    prep_permit_df.loc[prep_permit_df['Permit Type'].isin(staff_decision_permit_types), 'Staff Decision'] = 'Yes'
+
+    change_order = [('Staff Decision', 'No', 'Yes'), ('Public Decision', 'Yes', 'No')]
+    for (change_col, new_val, old_val) in change_order:
+        prep_permit_df = prep_permit_df \
+            .groupby('P_ID') \
+            .apply(Is_Decision_Task, 
+                change_col, new_val, old_val)
+
+    change_order = [('Staff Decision', 'Yes'), ('Public Decision', 'No')]
+    for (change_col, new_val) in change_order:
+        prep_permit_df = prep_permit_df \
+            .groupby('P_ID') \
+            .apply(Is_Staff_TaskStatus, change_col, new_val)
+        
+    change_order = [('Staff Decision', 'No'), ('Public Decision', 'Yes')]
+    for (change_col, new_val) in change_order:
+        prep_permit_df = prep_permit_df \
+            .groupby('P_ID') \
+            .apply(In_Public_TaskStatus, change_col, new_val)
+
+    prep_permit_df.loc[prep_permit_df['Permit Type'].isin(pub_hearing_permit_types), 'Public Decision'] = 'Yes'
+
+    prep_permit_df.drop(columns=['Task Status'], inplace=True)
+
+    return prep_permit_df
 
 #clean_addresses(raw_permit_df)['Address'].drop_duplicates().sort_values()
 
