@@ -188,6 +188,11 @@ def prepare_times(raw_permit_df, extra_list=[]):
         .drop_duplicates(subset=['Application #', 'Permit Type', 'Record Status']) \
         .set_index('Application #')
     
+    raw_admin_df['Notes'] = \
+        raw_admin_df['Notes'] \
+            .fillna('') \
+            .replace('nan', '')
+
     # sort tasks by rank
     raw_permit_df = add_task2rank(raw_permit_df.copy())
     # sort by when the statuses were updated
@@ -592,50 +597,245 @@ def fix_back2back_end_actions(pdf, pids, focus_cols = [
     pdf.loc[pdf['T_ID'].isin(fix_no_end), 'Action'] = 'end'
 
     return pdf
+## Round Functions
+
+def find_round(search_df, id_col = 'T_ID', action_col = 'Action'):
+    # finds rounds then exports as list
+    start_id = None
+    end_id = None
+    round_num = 0
+    round_list = []
+
+    pid = list(search_df[id_col].unique())[0].rsplit('-', 1)[0]
+
+    # python replace list item (round_list) with another based on
+    # 
+
+    for index,row in search_df.iterrows():
+        
+        if (row['Phase'] == 'Review')and(pid not in bad):
+            if 'start' in row[action_col]:
+                start_id = row[id_col]
+                end_id = None
+                round_num += 1
+                round_list.append(round_num)
+                
+
+            elif 'end' in row[action_col]:
+                start_id = None 
+                end_id = row[id_col]
+                round_list.append(round_num)
+                
+
+            else:
+                if start_id is not None:
+                    round_list.append(round_num)
+                else:
+                    round_list.append(0)
+                
+
+        else:
+            round_list.append(0)
+
+        #print(index, start_id, end_id, round_num, round_list, row['Phase'], row['Action'])    
+
+    return pd.Series(round_list, name='Round')
 
 def find_round_dict(group_df, id_col = 'T_ID', action_col = 'Action'):
-        
-        start_id = None
-        end_id = None
-        round_num = 0
-        round_dict = {}
+    # Goes through an id then finds the rounds    
+    # exports as dict    
+    start_id = None
+    end_id = None
+    round_num = 0
+    round_dict = {}
 
-        pid = group_df[id_col].unique()[0].rsplit('-', 1)[0]
+    pid = group_df[id_col].unique()[0].rsplit('-', 1)[0]
 
-        for _, row in group_df.iterrows():
-            if (row['Phase'] == 'Review') and (pid not in bad):
-                if 'start' in row[action_col]:
-                    start_id = row[id_col]
-                    end_id = None
-                    round_num += 1
-                    round_dict[row[id_col]] = round_num
-                elif 'end' in row[action_col]:
-                    start_id = None 
-                    end_id = row[id_col]
+    for _, row in group_df.iterrows():
+        if (row['Phase'] == 'Review') and (pid not in bad):
+            if 'start' in row[action_col]:
+                start_id = row[id_col]
+                end_id = None
+                round_num += 1
+                round_dict[row[id_col]] = round_num
+            elif 'end' in row[action_col]:
+                start_id = None 
+                end_id = row[id_col]
+                round_dict[row[id_col]] = round_num
+            else:
+                if start_id is not None:
                     round_dict[row[id_col]] = round_num
                 else:
-                    if start_id is not None:
-                        round_dict[row[id_col]] = round_num
-                    else:
-                        round_dict[row[id_col]] = 0
-            else:
-                round_dict[row[id_col]] = 0
+                    round_dict[row[id_col]] = 0
+        else:
+            round_dict[row[id_col]] = 0
 
-        return round_dict
+    return round_dict
 
-# get rounds
-def get_rounds(prep_permit_df):
-
-    
-    # Use the function
+def get_rounds(
+        prep_permit_df, 
+        main_id='P_ID', sub_id='T_ID',
+        round_col = 'Round'
+        ):
+    # runs find rounds function over task df
+    # creates large dictionary
+    # maps dictionary over IDs
     round_dict = {}
-    for _, group in prep_permit_df.groupby('P_ID'):
+    for _, group in prep_permit_df.groupby(main_id):
         round_dict.update(find_round_dict(group))
         
     # Now you can map the dict to create a new column
-    prep_permit_df['Round'] = prep_permit_df['T_ID'].map(round_dict)
+    prep_permit_df[round_col] = prep_permit_df[sub_id].map(round_dict)
 
     return prep_permit_df
+
+# 3. Aggregate Functions
+
+## Main Functions (un used)?
+def find_between_start_end(search_df, id_col = 'T_ID', action_col = 'Action'):
+    # I have a initial dataframe (called "seach_df") with two columns,  
+    # #"T_ID" that is a unique ID for each row and 
+    # "Action" that has three potential values: "start", "end", and None. 
+    # I want to have a list of each "T_ID" that is in a row between rows that have 
+    # a "start" and "end" in the "Action" column. 
+    # I want the lists of "T_ID" values to go into a new dataframe with each row being 
+    # each list with two new columns showing the "T_ID" value of the "start" and 
+    # one for the "end"
+
+    #in_between = []
+    start_id = None
+    end_id = None
+    round_num = 0
+    round_list = []
+
+    for _,row in search_df.iterrows():
+
+        if 'start' in row[action_col]:
+            start_id = row[id_col]
+            end_id = None
+            round_list = []
+            round_num += 1
+            continue
+
+        elif 'end' in row[action_col]:
+            end_id = row[id_col]
+            round_list.append(row[id_col])
+            yield start_id, end_id, round_list, round_num
+
+            round_list = []
+            start_id = None 
+            continue
+
+        else:
+            if start_id is not None:
+                round_list.append(row[id_col])
+            continue
+
+
+## get review round's dates & days df
+def get_review_round_dates(prep_permit_df):
+    rev_round_dates = \
+        prep_permit_df \
+            .loc[prep_permit_df['Round']>0] \
+            .dropna(subset=['Date Status']) \
+            .groupby(['P_ID','Round']) \
+            .agg({'Date Status':[min, max]})
+    rev_round_dates.columns = rev_round_dates.columns.droplevel(0)
+    rev_round_dates.columns = ['Start Date', 'Stop Date']
+
+    rev_round_dates['Dates'] = rev_round_dates.apply(lambda x: sum_days(x['Start Date'], x['Stop Date'], business_days=False), axis=1)
+    rev_round_dates['Biz Dates'] = rev_round_dates.apply(lambda x: sum_days(x['Start Date'], x['Stop Date'], business_days=True), axis=1)
+    rev_round_dates['Days'] = rev_round_dates['Dates'].apply(len)
+    rev_round_dates['Biz Days'] = rev_round_dates['Biz Dates'].apply(len)
+
+    return rev_round_dates
+
+## get total review dates
+def get_review_dates(
+        group, id_col = 'P_ID', 
+        start_col = 'Start Date', end_col = 'Stop Date'
+        ):
+    start_date = group[start_col].min()
+    end_date = group[end_col].max()
+    return sum_days
+## combine sub-lists into main-list
+def merge_lists(series):
+    return list(set([i for sublist in series for i in sublist]))
+
+## get review's total, customer, and staff dates
+def get_review_total_dates(rev_round_dates):
+    rdate_aggs = {
+        'Start Date': 'min', 'Stop Date': 'max', 
+        'Dates':merge_lists, 'Biz Dates':merge_lists,
+        'Round':'count'}
+    rev_rename = {
+        'Round':'Rounds', 
+        'Dates':'Review Staff Dates', 
+        'Biz Dates':'Review Staff Biz Dates'
+        }
+    rev_tot_dates = rev_round_dates \
+        .reset_index() \
+        .loc[rev_round_dates.reset_index()['Round'] > 0] \
+        .groupby('P_ID') \
+        .agg(rdate_aggs) \
+        .rename(columns=rev_rename)
+    rev_tot_dates['Review Dates'] = \
+        rev_tot_dates \
+            .apply(lambda row: sum_days(
+                row['Start Date'], row['Stop Date'], business_days=False
+            ), axis=1)
+    rev_tot_dates['Review Biz Dates'] = \
+        rev_tot_dates.apply(lambda row: sum_days(row['Start Date'], row['Stop Date']), axis=1)
+
+    for date_col in ['Dates', 'Biz Dates']:
+        rev_tot_dates[f'Customer {date_col}'] = \
+            rev_tot_dates.apply(lambda row: list(set(row[f'Review {date_col}']) ^ set(row[f'Review Staff {date_col}'])), axis=1)
+
+    return rev_tot_dates
+
+## get Decision dates
+def get_decision_dates(prep_permit_df):
+
+    prep_permit_df['Max Review Date'] = \
+        prep_permit_df \
+            .loc[prep_permit_df['Phase']=='Review'] \
+            .groupby('P_ID')['Date Status'] \
+            .transform('max')
+    prep_permit_df['Max Review Date'] \
+        .fillna(pd.Timestamp('1900-01-01'), inplace=True)
+
+    phase_filt = (prep_permit_df['Phase']=='Decision')
+    max_filt = (prep_permit_df['Date Status'] >= prep_permit_df['Max Review Date'])
+
+    dec_df = \
+        prep_permit_df \
+            .loc[phase_filt&max_filt] \
+            .groupby('P_ID') \
+            .agg({'Date Status': ['min', 'max']}) \
+            .rename(columns={'min':'Start Date', 'max':'Stop Date'}) \
+            .droplevel(0, axis=1)
+    
+    dec_df['Decision Dates'] = \
+        dec_df \
+            .apply(lambda row: sum_days(
+                row['Start Date'], row['Stop Date'], 
+                business_days=False), axis=1)
+    
+    dec_df['Decision Biz Dates'] = \
+        dec_df \
+            .apply(lambda row: sum_days(
+                row['Start Date'], row['Stop Date'], 
+                business_days=True), axis=1)
+    
+    dec_rename = {
+        'Start Date':'Decision Start Date',
+        'Stop Date':'Decision Stop Date'
+    }
+    dec_df \
+        .rename(dec_rename, axis=1, inplace=True)
+    
+    return dec_df
+
 
 # get decisions
 

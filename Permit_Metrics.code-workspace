@@ -20,5 +20,10 @@
 			"path": "O:/CDD/PLANNING/GIS/Projects/Permit_Metrics"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"[python]": {
+			"editor.defaultFormatter": "ms-python.black-formatter"
+		},
+		"python.formatting.provider": "none"
+	}
 }
