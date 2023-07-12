@@ -137,7 +137,6 @@ board_dec_t = [
 ]
 
 
-
 # BAD PERMITS?
 bad = [
     'Y18-036',  # inconsistent starts
