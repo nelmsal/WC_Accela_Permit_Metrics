@@ -139,28 +139,29 @@ board_dec_t = [
 
 # BAD PERMITS?
 bad = [
+    'Y18-031',  # resub after PC decision
     'Y18-036',  # inconsistent starts
     'Y18-072',
-    'Y21-111',  
-    'Y21-053',   # weird multi deemed incomplete with DRC in the front
+    'Y18-013',  # CEQA caused odd resubmittal
     'Y18-039',  # CEQA problem
     'Y18-058',  # resub after PC decision
     'Y18-066',  # missing resubmittal
+    'Y18-088',  # missing resubmittal
+    'Y19-010',  # resub after PC decision
     'Y19-020',  # appealed then resub
+    'Y19-041',  # weird ordering of resubmittal
     'Y19-057',  # resub after staff & PC decision
     'Y19-110',  # resub after PC decision
     'Y19-122',  # resub after PC decision
     'Y19-123',  # resub after PC decision
-    'Y18-031',  # resub after PC decision
-    'Y18-088',  # missing resubmittal
-    'Y19-010',  # resub after PC decision
-    'Y19-041',  # weird ordering of resubmittal
-    'Y21-011',  # missing resubmittal,
+    'Y19-140',   # withdrawn
+    'Y21-011',  # missing resubmittal,  
+    'Y21-053',   # weird multi deemed incomplete with DRC in the front
     'Y21-065',  # missing resubmittal
     'Y21-099',  # missing resubmittal
+    'Y21-111',
     'Y21-114',  # missing resubmittal
     'Y21-033',  # missing resubmittal
-
     ''
 ]
 sorta_bad = [
